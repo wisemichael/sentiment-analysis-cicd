@@ -1,0 +1,17 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Copy requirements first for better caching
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY monitoring/ ./monitoring/
+
+EXPOSE 8501
+
+# Environment variable for API URL
+ENV API_URL=http://api:8000/predict
+
+CMD ["streamlit", "run", "monitoring/app.py", "--server.port=8501", "--server.address=0.0.0.0", "--server.headless=true"]
