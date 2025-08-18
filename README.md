@@ -9,6 +9,7 @@ A minimal sentiment analysis system with:
 
 ---
 
+
 ## Project Architecture
 
 - **Services**
@@ -145,6 +146,8 @@ sudo apt-get update -y
 sudo apt-get install -y docker.io git
 sudo systemctl enable --now docker
 sudo usermod -aG docker ubuntu
+sudo systemctl enable --now docker
+newgrp docker   # or reconnect SSH after 'usermod -aG docker ubuntu'
 # Reconnect SSH so your user has docker perms, or run 'newgrp docker'
 
 # Cloning
