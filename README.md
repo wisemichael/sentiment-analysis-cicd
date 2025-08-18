@@ -44,12 +44,12 @@ README.md
 
 ---
 
-## 2) Local Development (no Docker)
+## Local Development (no Docker)
 
 **Prereqs:** Python 3.11 and `pip`.
 
 ```bash```
-# 1) Create & activate a virtual environment
+# Create & activate a virtual environment
 python -m venv .venv
 
 # Windows PowerShell
@@ -57,26 +57,26 @@ python -m venv .venv
 # macOS/Linux
 # source .venv/bin/activate
 
-# 2) Install dependencies
+# Install dependencies
 pip install -r requirements.txt
 
-# 3) Run the API (http://localhost:8000)
+# Run the API (http://localhost:8000)
 uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
 
-# 4) In a NEW terminal, set API_URL for Streamlit
+# In a NEW terminal, set API_URL for Streamlit
 # Windows PowerShell:
 $env:API_URL="http://localhost:8000"
 # macOS/Linux:
 # export API_URL="http://localhost:8000"
 
-# 5) Run the dashboard (http://localhost:8501)
+# Run the dashboard (http://localhost:8501)
 streamlit run monitoring/app.py
 
-# 6) Quick checks
+# Quick checks
 curl -s http://localhost:8000/health
 curl -s -X POST http://localhost:8000/predict -H "Content-Type: application/json" -d '{"text":"I love this!"}'
 
-# 7) Lint & tests
+# Lint & tests
 flake8 api/ monitoring/ tests/
 pytest -q
 
