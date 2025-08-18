@@ -1,5 +1,11 @@
 [flake8]
-max-line-length = 88
-exclude = .git,__pycache__,.venv,build,dist,*.egg
-ignore = E203,W503
-max-complexity = 10
+max-line-length = 100
+
+extend-ignore = E203, W503
+
+# Tests and the Streamlit UI can have long lines / strings
+per-file-ignores =
+  tests/*: E501
+  monitoring/*: E501
+
+max-complexity = 12
