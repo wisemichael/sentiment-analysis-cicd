@@ -9,8 +9,6 @@ API_URL = os.getenv("API_URL", "http://localhost:8000")
 def main():
     st.title("Sentiment Analysis Monitoring Dashboard")
     st.markdown("---")
-
-
     text = st.text_area("Enter text to analyze:", height=100)
 
     if st.button("Analyze Sentiment", type="primary"):
