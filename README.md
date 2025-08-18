@@ -40,36 +40,42 @@ README.md
 
 ---
 
-## Local Development (no Docker)
 
-**Prereqs:** Python 3.11, pip.
+---
+
+## 2) Local Development (no Docker)
+
+**Prereqs:** Python 3.11 and `pip`.
 
 ```bash```
-# Create & activate venv
+# 1) Create & activate a virtual environment
 python -m venv .venv
+
 # Windows PowerShell
 . .venv/Scripts/Activate.ps1
-# macOS/Linux:
+# macOS/Linux
 # source .venv/bin/activate
 
+# 2) Install dependencies
 pip install -r requirements.txt
 
-# Running API
+# 3) Run the API (http://localhost:8000)
 uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
 
-# Running Streamlit dashboard
+# 4) In a NEW terminal, set API_URL for Streamlit
 # Windows PowerShell:
 $env:API_URL="http://localhost:8000"
 # macOS/Linux:
 # export API_URL="http://localhost:8000"
 
+# 5) Run the dashboard (http://localhost:8501)
 streamlit run monitoring/app.py
 
-# Sanity checks
+# 6) Quick checks
 curl -s http://localhost:8000/health
-curl -s -X POST http://localhost:8000/predict \
-  -H "Content-Type: application/json" \
-  -d '{"text":"I love this!"}'
+curl -s -X POST http://localhost:8000/predict -H "Content-Type: application/json" -d '{"text":"I love this!"}'
+
+# 7) Lint & tests
 flake8 api/ monitoring/ tests/
 pytest -q
 
@@ -106,3 +112,81 @@ curl -s -X POST http://localhost:8000/predict -H "Content-Type: application/json
 docker exec api ls -l /app/logs
 docker exec api tail -n 5 /app/logs/prediction_logs.json
 docker exec monitoring ls -l /app/logs
+
+---
+
+## EC2 Deployment
+
+Launch EC2
+EC2 → Launch instance
+AMI: Ubuntu 22.04 LTS
+Instance type: t2.micro
+Key pair: create or select (.pem)
+
+Security Group inbound rules (during setup you can start open, then lock down later):
+22 (SSH) – for now 0.0.0.0/0 (later: “My IP”)
+8000 (API) – 0.0.0.0/0 (optional if you’ll use SSH tunnel)
+8501 (Streamlit) – 0.0.0.0/0 (optional if you’ll use SSH tunnel)
+
+Launch and note the Public IPv4 DNS/IP. 
+34.226.191.36
+
+# SSH/Server Info
+cd $HOME\Downloads
+# (Optional) restrict key permissions if Windows complains
+icacls .\aws-key.pem /inheritance:r
+icacls .\aws-key.pem /grant:r "$($env:USERNAME):(R)"
+
+ssh -i .\aws-key.pem ubuntu@34.226.191.36
+
+# Install Docker
+On the EC2 box
+sudo apt-get update -y
+sudo apt-get install -y docker.io git
+sudo systemctl enable --now docker
+sudo usermod -aG docker ubuntu
+# Reconnect SSH so your user has docker perms, or run 'newgrp docker'
+
+# Cloning
+cd ~
+git clone https://github.com/wisemichael/sentiment-analysis-cicd.git
+cd sentiment-analysis-cicd
+git branch -a   # confirm branches
+
+# Build Images on EC2
+docker build -t sentiment-api -f Dockerfile.api .
+docker build -t sentiment-monitor -f Dockerfile.monitoring .
+
+# Shared volume + network
+docker volume create app-logs
+docker network create sentiment-net
+
+# API
+docker run -d --name api --network sentiment-net \
+  -p 8000:8000 \
+  -v app-logs:/app/logs \
+  sentiment-api
+
+# Monitoring (points to 'api' by service name)
+docker run -d --name monitoring --network sentiment-net \
+  -p 8501:8501 \
+  -e API_URL=http://api:8000 \
+  -v app-logs:/app/logs \
+  sentiment-monitor
+
+# Verify from EC2
+curl -s http://localhost:8000/health
+curl -s -X POST http://localhost:8000/predict \
+  -H "Content-Type: application/json" \
+  -d '{"text":"This is great!"}'
+
+# See that both containers share the logs volume
+docker exec api        ls -l /app/logs
+docker exec api        tail -n 5 /app/logs/prediction_logs.json
+docker exec monitoring ls -l /app/logs
+
+# Public IPs
+[http://localhost:8000/docs](http://34.226.191.36:8000/docs)
+[http://localhost:8000/health](http://34.226.191.36:8000/health)
+[http://localhost:8501](http://34.226.191.36:8501)
+
