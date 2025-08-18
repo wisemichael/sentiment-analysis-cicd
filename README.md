@@ -1,31 +1,42 @@
-# Assignment 6: MLOps CI/CD Pipeline
+# Assignment 6: CI/CD & Testing – Sentiment System
 
-## Overview
-This project implements a sentiment analysis system with CI/CD pipeline using GitHub Actions, containerized services, and deployment on AWS EC2.
+This project deploys a sentiment analysis system consisting of:
+- **FastAPI backend** (in `api/`) with `/predict` and `/health`
+- **Streamlit monitoring dashboard** (in `monitoring/`)
+- **CI/CD** pipeline (GitHub Actions) that lints with **flake8** and tests with **pytest**
+- **Docker** images for both services
+- **Manual AWS EC2** deployment guide
 
-## Architecture
-- **FastAPI Backend**: RESTful API for sentiment analysis
-- **Streamlit Dashboard**: Web interface for monitoring and testing
-- **GitHub Actions CI/CD**: Automated testing and linting
-- **Docker Containers**: Containerized deployment
-- **AWS EC2**: Production deployment environment
+---
 
-## Services
-1. **API Service** (Port 8000): FastAPI with sentiment prediction endpoint
-2. **Monitoring Service** (Port 8501): Streamlit dashboard for testing and monitoring
+## Project Architecture
 
-## Local Development
+- **Compute**: Single Ubuntu EC2 instance
+- **Containers**:
+  - `api` → FastAPI served by Uvicorn on port **8000**
+  - `monitoring` → Streamlit dashboard on port **8501**
+- **Networking**:
+  - Both containers can share a Docker network
+  - Dashboard uses `API_URL` env var to call the API (defaults to `http://api:8000/predict` in Docker)
+- **CI/CD**:
+  - PRs to `main` trigger GitHub Actions (`.github/workflows/ci.yml`)
+  - Steps: checkout → set up Python → `pip install` → `flake8` → `pytest`
 
-### Prerequisites
-- Python 3.11+
+---
+
+## Local Development (Docker)
+
+> The rubric asks for Docker instructions for local running.
+
+### Prereqs
 - Docker Desktop
 - Git
 
-### Setup
+### Clone
 ```bash
-# Clone repository
-git clone <your-repo-url>
-cd Assignment-6
+git clone < https://github.com/wisemichael/sentiment-analysis-cicd >
+cd < sentiment-analysis-cicd >
+
 
 # Create virtual environment
 python -m venv .venv
@@ -52,9 +63,10 @@ flake8 api/ monitoring/
 
 # Docker
 
-# Docker Build
+# Docker build images
 docker build -t sentiment-api -f Dockerfile.api .
 docker build -t sentiment-monitoring -f Dockerfile.monitoring .
+
 
 # Docker Run
 # Create network and volume
@@ -65,8 +77,11 @@ docker volume create app-logs
 docker run -d --name api --network sentiment-net \
   -p 8000:8000 -v app-logs:/logs sentiment-api
 
-# Run Monitoring
+# Monitoring API
 docker run -d --name monitoring --network sentiment-net \
   -p 8501:8501 -e API_URL=http://api:8000/predict \
   -v app-logs:/logs sentiment-monitoring
 
+# Access
+API docs: http://localhost:8000
+Dashboard: http://localhost:8501
