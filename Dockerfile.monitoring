@@ -5,9 +5,10 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Copy Streamlit app
 COPY monitoring/ ./monitoring/
 
-# Streamlit settings
+# Streamlit + API settings
 ENV API_URL=http://api:8000
 ENV STREAMLIT_SERVER_HEADLESS=true
 

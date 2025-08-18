@@ -1,87 +1,108 @@
-# Assignment 6: CI/CD & Testing – Sentiment System
+# Assignment 6 — CI/CD & Testing: Sentiment System
 
-This project deploys a sentiment analysis system consisting of:
-- **FastAPI backend** (in `api/`) with `/predict` and `/health`
-- **Streamlit monitoring dashboard** (in `monitoring/`)
-- **CI/CD** pipeline (GitHub Actions) that lints with **flake8** and tests with **pytest**
-- **Docker** images for both services
-- **Manual AWS EC2** deployment guide
+A minimal sentiment analysis system with:
+
+- **FastAPI backend** (`api/`) exposing `/predict` and `/health`, and writing JSON logs to `/app/logs/prediction_logs.json`.
+- **Streamlit dashboard** (`monitoring/`) calling the API and displaying responses.
+- **CI** via GitHub Actions (`.github/workflows/ci.yml`) that runs **flake8** and **pytest** on pull requests to `main`.
+- **Docker** images for both services, designed to run together on a single **Ubuntu EC2** instance with a **shared volume**.
 
 ---
 
 ## Project Architecture
 
-- **Compute**: Single Ubuntu EC2 instance
-- **Containers**:
-  - `api` → FastAPI served by Uvicorn on port **8000**
-  - `monitoring` → Streamlit dashboard on port **8501**
-- **Networking**:
-  - Both containers can share a Docker network
-  - Dashboard uses `API_URL` env var to call the API (defaults to `http://api:8000/predict` in Docker)
-- **CI/CD**:
-  - PRs to `main` trigger GitHub Actions (`.github/workflows/ci.yml`)
-  - Steps: checkout → set up Python → `pip install` → `flake8` → `pytest`
+- **Services**
+  - **API (FastAPI/Uvicorn)** — listens on **port 8000**.
+  - **Monitoring (Streamlit)** — listens on **port 8501**.
+- **Shared state**
+  - A named Docker volume mounted at **`/app/logs`** in both containers.
+  - API appends one JSON object per line to `prediction_logs.json` (under `/app/logs/`).
+- **Connectivity**
+  - Containers share a Docker network (e.g., `sentiment-net`).
+  - Dashboard uses an environment variable **`API_URL`** to reach the API:
+    - **Local (no Docker):** `http://localhost:8000`
+    - **Docker:** `http://api:8000`
+
+# Project layout:
+api/
+  main.py
+monitoring/
+  app.py
+tests/
+  api/test_api.py
+  monitoring/testdashboard.py
+.github/workflows/ci.yml
+Dockerfile.api
+Dockerfile.monitoring
+requirements.txt
+README.md
+
 
 ---
 
-## Local Development (Docker)
+## Local Development (no Docker)
 
-> The rubric asks for Docker instructions for local running.
+**Prereqs:** Python 3.11, pip.
 
-### Prereqs
-- Docker Desktop
-- Git
-
-### Clone
-```bash
-git clone < https://github.com/wisemichael/sentiment-analysis-cicd >
-cd < sentiment-analysis-cicd >
-
-
-# Create virtual environment
+```bash```
+# Create & activate venv
 python -m venv .venv
-source .venv/bin/activate  # or .venv\Scripts\activate on Windows
+# Windows PowerShell
+. .venv/Scripts/Activate.ps1
+# macOS/Linux:
+# source .venv/bin/activate
 
-# Install dependencies
 pip install -r requirements.txt
 
-# Running
-
-# Start API
+# Running API
 uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
 
-# Start Dashboard (new terminal)
+# Running Streamlit dashboard
+# Windows PowerShell:
+$env:API_URL="http://localhost:8000"
+# macOS/Linux:
+# export API_URL="http://localhost:8000"
+
 streamlit run monitoring/app.py
 
-# Testing
+# Sanity checks
+curl -s http://localhost:8000/health
+curl -s -X POST http://localhost:8000/predict \
+  -H "Content-Type: application/json" \
+  -d '{"text":"I love this!"}'
+flake8 api/ monitoring/ tests/
+pytest -q
 
-# Run custom tests
-python run_tests.py
+---
 
-# Run linting
-flake8 api/ monitoring/
+# Docker Development
 
-# Docker
-
-# Docker build images
+# Building Images
 docker build -t sentiment-api -f Dockerfile.api .
-docker build -t sentiment-monitoring -f Dockerfile.monitoring .
+docker build -t sentiment-monitor -f Dockerfile.monitoring .
 
-
-# Docker Run
-# Create network and volume
-docker network create sentiment-net
+# Create Shared Volumes and Network
 docker volume create app-logs
+docker network create sentiment-net
 
-# Run API
+# Running Containers
+# API
 docker run -d --name api --network sentiment-net \
-  -p 8000:8000 -v app-logs:/logs sentiment-api
+  -p 8000:8000 \
+  -v app-logs:/app/logs \
+  sentiment-api
 
-# Monitoring API
+# Monitoring (note API_URL points to the API service name)
 docker run -d --name monitoring --network sentiment-net \
-  -p 8501:8501 -e API_URL=http://api:8000/predict \
-  -v app-logs:/logs sentiment-monitoring
+  -p 8501:8501 \
+  -e API_URL=http://api:8000 \
+  -v app-logs:/app/logs \
+  sentiment-monitor
 
-# Access
-API docs: http://localhost:8000
-Dashboard: http://localhost:8501
+# Verification
+curl -s http://localhost:8000/health
+curl -s -X POST http://localhost:8000/predict -H "Content-Type: application/json" -d '{"text":"This is great!"}'
+
+docker exec api ls -l /app/logs
+docker exec api tail -n 5 /app/logs/prediction_logs.json
+docker exec monitoring ls -l /app/logs

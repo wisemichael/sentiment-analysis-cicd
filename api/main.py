@@ -6,7 +6,7 @@ import logging
 import json
 from datetime import datetime
 
-# --- logging setup (console + file in shared volume) ---
+# --- Generates setup for logging sentiments ---
 LOG_DIR = os.getenv("LOG_DIR", "logs")
 os.makedirs(LOG_DIR, exist_ok=True)
 LOG_FILE = os.path.join(LOG_DIR, "prediction_logs.json")
@@ -52,7 +52,7 @@ def predict(input_data: TextInput):
         sentiment = predict_sentiment(input_data.text)
         logger.info("Predicted sentiment: %s", sentiment)
 
-        # append a log line to the shared volume
+        # Append a log line to the shared volume.
         entry = {
             "timestamp": datetime.utcnow().isoformat(),
             "request_text": input_data.text,
