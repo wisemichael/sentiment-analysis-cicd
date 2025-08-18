@@ -1,4 +1,5 @@
-# tests/api/test_api.py
+"""Tests for the FastAPI sentiment API."""
+
 from fastapi.testclient import TestClient
 from api.main import app
 
@@ -6,17 +7,26 @@ from api.main import app
 client = TestClient(app)
 
 
-def test_predict_positive():
+def test_health_ok():
+    r = client.get("/health")
+    assert r.status_code == 200
+    assert r.json() == {"status": "ok"}
+
+
+def test_predict_positive_example():
     r = client.post("/predict", json={"text": "I love this product!"})
     assert r.status_code == 200
     data = r.json()
+    assert "sentiment" in data
     assert data["sentiment"] in {"positive", "neutral", "negative"}
 
 
 def test_predict_negative_example():
     r = client.post("/predict", json={"text": "This is awful."})
     assert r.status_code == 200
-    assert r.json()["sentiment"] in {"positive", "neutral", "negative"}
+    data = r.json()
+    assert "sentiment" in data
+    assert data["sentiment"] in {"positive", "neutral", "negative"}
 
 
 def test_predict_missing_text():
@@ -27,4 +37,3 @@ def test_predict_missing_text():
 def test_predict_malformed_type():
     r = client.post("/predict", json={"text": 123})
     assert r.status_code in (400, 422)
-
