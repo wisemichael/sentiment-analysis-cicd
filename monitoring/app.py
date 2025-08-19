@@ -5,10 +5,10 @@ import streamlit as st
 # Use base URL; the code will append /predict and /health
 API_URL = os.getenv("API_URL", "http://localhost:8000")
 
+
 def main():
     st.title("Sentiment Analysis Monitoring Dashboard")
     st.markdown("---")
-
     text = st.text_area("Enter text to analyze:", height=100)
 
     if st.button("Analyze Sentiment", type="primary"):
@@ -42,6 +42,7 @@ def main():
                 st.success("🟢 API is healthy" if r.status_code == 200 else "🔴 API unhealthy")
             except Exception:
                 st.error("🔴 API not reachable")
+
 
 if __name__ == "__main__":
     main()
