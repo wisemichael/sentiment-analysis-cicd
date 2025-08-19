@@ -13,7 +13,6 @@ if str(ROOT) not in sys.path:
 from fastapi.testclient import TestClient
 from api.main import app
 
-
 client = TestClient(app)
 
 
@@ -21,7 +20,6 @@ def test_health_ok():
     r = client.get("/health")
     assert r.status_code == 200
     data = r.json()
-    # Accept either form
     assert data.get("status") in {"ok", "healthy"}
 
 
