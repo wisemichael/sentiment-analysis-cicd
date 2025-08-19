@@ -1,5 +1,7 @@
 # Assignment 6 — CI/CD & Testing: Sentiment System
 
+This project is a minimal sentiment analysis system with two services: a FastAPI backend that exposes /predict and /health, and a Streamlit dashboard that calls that API and displays results. Both services are containerized with Docker, share a named volume for logs, and are designed to run together on a single Ubuntu EC2 instance. A GitHub Actions pipeline runs flake8 and pytest on pushes and on pull requests, and the assignment is submitted as a PR from dev to main.
+
 A minimal sentiment analysis system with:
 
 - **FastAPI backend** (`api/`) exposing `/predict` and `/health`, and writing JSON logs to `/app/logs/prediction_logs.json`.
@@ -25,18 +27,18 @@ A minimal sentiment analysis system with:
     - **Docker:** `http://api:8000`
 
 # Project layout:
-api/
-  main.py
-monitoring/
-  app.py
-tests/
-  api/test_api.py
-  monitoring/testdashboard.py
-.github/workflows/ci.yml
-Dockerfile.api
-Dockerfile.monitoring
-requirements.txt
-README.md
+-api/
+  -main.py
+-monitoring/
+  -app.py
+-tests/
+  -api/test_api.py
+  -monitoring/testdashboard.py
+-.github/workflows/ci.yml
+-Dockerfile.api
+-Dockerfile.monitoring
+-requirements.txt
+-README.md
 
 
 ---
@@ -119,12 +121,16 @@ docker exec monitoring ls -l /app/logs
 ## EC2 Deployment
 
 Launch EC2
-EC2 → Launch instance
-AMI: Ubuntu 22.04 LTS
-Instance type: t2.micro
-Key pair: create or select (.pem)
+EC2 → Launch instance:
+  AMI: Ubuntu 22.04 LTS
+  Instance type: t2.micro
+  Key pair: create/select a .pem
+  Security Group inbound rules:
+  22 (SSH) — 0.0.0.0/0 (or “My IP”)
+  8000 (API) — 0.0.0.0/0 (optional if you’ll use SSH tunnel)
+  8501 (Streamlit) — 0.0.0.0/0 (optional if you’ll use SSH tunnel)
 
-Security Group inbound rules (during setup you can start open, then lock down later):
+Security Group inbound rules:
 22 (SSH) – for now 0.0.0.0/0 (later: “My IP”)
 8000 (API) – 0.0.0.0/0 (optional if you’ll use SSH tunnel)
 8501 (Streamlit) – 0.0.0.0/0 (optional if you’ll use SSH tunnel)
@@ -188,8 +194,32 @@ docker exec api        ls -l /app/logs
 docker exec api        tail -n 5 /app/logs/prediction_logs.json
 docker exec monitoring ls -l /app/logs
 
+# If corporate firewall exits
+ssh -i $HOME\Downloads\aws-key.pem `
+    -L 8000:localhost:8000 `
+    -L 8501:localhost:8501 `
+    ubuntu@<34.226.191.36
+sudo ufw status
+sudo ufw allow 22
+sudo ufw allow 8000
+sudo ufw allow 8501
+
+docker ps
+docker logs api --tail 50
+docker logs monitoring --tail 50
+
+# Clean restart
+docker rm -f monitoring api || true
+# (then re-run the two docker run commands)
+
+---
+
 # Public IPs
 [http://localhost:8000/docs](http://34.226.191.36:8000/docs)
 [http://localhost:8000/health](http://34.226.191.36:8000/health)
 [http://localhost:8501](http://34.226.191.36:8501)
 
+# CI Testing
+flake8 api/ monitoring/ tests/
+pytest -q
+Open a pull request from dev → main
