@@ -1,60 +1,38 @@
-# Byte-compiled / optimized / DLL files
+# python
 __pycache__/
-*.py[cod]
-*$py.class
-
-# C extensions
-*.so
-
-# Distribution / packaging
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
+*.pyc
+*.pyo
+*.pyd
 *.egg-info/
-.installed.cfg
-*.egg
-
-# Virtual environments
 .venv/
 venv/
-ENV/
-env/
 
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
+# tests & linters
+.pytest_cache/
+.ruff_cache/
 
-# OS generated files
+# notebooks
+.ipynb_checkpoints/
+
+# local config & secrets
+.env
+.env.*
+!*.env.example
+
+# mlflow & artifacts
+mlflow.db
+mlruns/
+wandb/
+ml/artifacts/
+*.joblib
+
+# streamlit cache
+.streamlit/
+
+# docker
+**/.dockerignore
+
+# OS
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
 
-logs/
-*.log
-
-# Environment variables
-.env
-
-# Testing
-.coverage
-.pytest_cache/
-htmlcov/
-
-# Docker
-.dockerignore

@@ -1,225 +1,142 @@
-# Assignment 6 — CI/CD & Testing: Sentiment System
+## Toxic Comment Classifier
 
-This project is a minimal sentiment analysis system with two services: a FastAPI backend that exposes /predict and /health, and a Streamlit dashboard that calls that API and displays results. Both services are containerized with Docker, share a named volume for logs, and are designed to run together on a single Ubuntu EC2 instance. A GitHub Actions pipeline runs flake8 and pytest on pushes and on pull requests, and the assignment is submitted as a PR from dev to main.
+## What it does
+Binary toxicity classifier (**TF-IDF + Logistic Regression**) served via **FastAPI**, with a **Streamlit** demo UI and a **Streamlit** monitoring dashboard.  
+Predictions and user feedback are stored in **Postgres**.
 
-A minimal sentiment analysis system with:
+## Architecture
 
-- **FastAPI backend** (`api/`) exposing `/predict` and `/health`, and writing JSON logs to `/app/logs/prediction_logs.json`.
-- **Streamlit dashboard** (`monitoring/`) calling the API and displaying responses.
-- **CI** via GitHub Actions (`.github/workflows/ci.yml`) that runs **flake8** and **pytest** on pull requests to `main`.
-- **Docker** images for both services, designed to run together on a single **Ubuntu EC2** instance with a **shared volume**.
+[User] ---> [Frontend (Streamlit demo)] ---> [API (FastAPI)] ---> [Postgres DB]|v[Monitoring (Streamlit dashboard)]
+---
+
+## Project layout
+ml/ # training & artifacts
+api/ # FastAPI app
+frontend/ # Streamlit demo
+monitoring/ # Streamlit monitoring dashboard
+infra/ # docker-compose.dev.yaml
+
+## Contents
+
+- [Architecture](#architecture)
+- [Project Layout](#project-layout)
+- [Prerequisites](#prerequisites)
+- [Run with Docker (recommended)](#run-with-docker-recommended)
+  - [Start, Stop, Rebuild](#start-stop-rebuild)
+  - [Service URLs](#service-urls)
+  - [Quick Smoke Tests](#quick-smoke-tests)
+  - [Logs, Status, and Shell Access](#logs-status-and-shell-access)
+  - [Database: persistence & inspection](#database-persistence--inspection)
+- [Environment Variables](#environment-variables)
+- [Endpoints](#endpoints)
+- [Training (optional)](#training-optional)
+- [Testing (optional)](#testing-optional)
+- [Troubleshooting](#troubleshooting)
+- [Cleanup](#cleanup)
+- [Instructor Notes](#instructor-notes)
 
 ---
 
+## Prereqs
+- Docker Desktop
+- Python 3.12 for local runs
 
-## Project Architecture
+## Run with Docker
 
-- **Services**
-  - **API (FastAPI/Uvicorn)** — listens on **port 8000**.
-  - **Monitoring (Streamlit)** — listens on **port 8501**.
-- **Shared state**
-  - A named Docker volume mounted at **`/app/logs`** in both containers.
-  - API appends one JSON object per line to `prediction_logs.json` (under `/app/logs/`).
-- **Connectivity**
-  - Containers share a Docker network (e.g., `sentiment-net`).
-  - Dashboard uses an environment variable **`API_URL`** to reach the API:
-    - **Local (no Docker):** `http://localhost:8000`
-    - **Docker:** `http://api:8000`
+Start everything (API + frontend + monitoring + Postgres):
 
-# Project layout:
--api/
-  -main.py
--monitoring/
-  -app.py
--tests/
-  -api/test_api.py
-  -monitoring/testdashboard.py
--.github/workflows/ci.yml
--Dockerfile.api
--Dockerfile.monitoring
--requirements.txt
--README.md
+```bash
+
+# Start the app
+docker compose -f infra/docker-compose.dev.yaml up --build
 
 
----
+# Rebuild only one service
+docker compose -f infra/docker-compose.dev.yaml up -d --build toxic-api
+docker compose -f infra/docker-compose.dev.yaml up -d --build toxic-frontend
+docker compose -f infra/docker-compose.dev.yaml up -d --build toxic-monitoring
+
+## Services
+
+Service URLs
+
+API (FastAPI): http://localhost:8000
+Swagger docs: http://localhost:8000/docs
+Frontend (Streamlit demo): http://localhost:8501
+Monitoring (Streamlit dashboard): http://localhost:8502
+Postgres: localhost:5432 (inside compose: service name `postgres`)
+DB user: postgres
+DB password: postgres
+DB name: preds
+Table: predictions
 
 
----
+## Monitoring/Health
+curl http://localhost:8000/health
+# -> {"ok":true,"model_version":"baseline-tfidf-logreg"}
 
-## Local Development (no Docker)
-
-**Prereqs:** Python 3.11 and `pip`.
-
-```bash```
-# Create & activate a virtual environment
-python -m venv .venv
-
-# Windows PowerShell
-. .venv/Scripts/Activate.ps1
-# macOS/Linux
-# source .venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Run the API (http://localhost:8000)
-uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
-
-# In a NEW terminal, set API_URL for Streamlit
-# Windows PowerShell:
-$env:API_URL="http://localhost:8000"
-# macOS/Linux:
-# export API_URL="http://localhost:8000"
-
-# Run the dashboard (http://localhost:8501)
-streamlit run monitoring/app.py
-
-# Quick checks
-curl -s http://localhost:8000/health
-curl -s -X POST http://localhost:8000/predict -H "Content-Type: application/json" -d '{"text":"I love this!"}'
-
-# Lint & tests
-flake8 api/ monitoring/ tests/
-pytest -q
-
----
-
-# Docker Development
-
-# Building Images
-docker build -t sentiment-api -f Dockerfile.api .
-docker build -t sentiment-monitor -f Dockerfile.monitoring .
-
-# Create Shared Volumes and Network
-docker volume create app-logs
-docker network create sentiment-net
-
-# Running Containers
-# API
-docker run -d --name api --network sentiment-net \
-  -p 8000:8000 \
-  -v app-logs:/app/logs \
-  sentiment-api
-
-# Monitoring (note API_URL points to the API service name)
-docker run -d --name monitoring --network sentiment-net \
-  -p 8501:8501 \
-  -e API_URL=http://api:8000 \
-  -v app-logs:/app/logs \
-  sentiment-monitor
-
-# Verification
-curl -s http://localhost:8000/health
-curl -s -X POST http://localhost:8000/predict -H "Content-Type: application/json" -d '{"text":"This is great!"}'
-
-docker exec api ls -l /app/logs
-docker exec api tail -n 5 /app/logs/prediction_logs.json
-docker exec monitoring ls -l /app/logs
-
----
-
-## EC2 Deployment
-
-Launch EC2
-EC2 → Launch instance:
-  AMI: Ubuntu 22.04 LTS
-  Instance type: t2.micro
-  Key pair: create/select a .pem
-  Security Group inbound rules:
-  22 (SSH) — 0.0.0.0/0 (or “My IP”)
-  8000 (API) — 0.0.0.0/0 (optional if you’ll use SSH tunnel)
-  8501 (Streamlit) — 0.0.0.0/0 (optional if you’ll use SSH tunnel)
-
-Security Group inbound rules:
-22 (SSH) – for now 0.0.0.0/0 (later: “My IP”)
-8000 (API) – 0.0.0.0/0 (optional if you’ll use SSH tunnel)
-8501 (Streamlit) – 0.0.0.0/0 (optional if you’ll use SSH tunnel)
-
-Launch and note the Public IPv4 DNS/IP. 
-34.226.191.36
-
-# SSH/Server Info
-cd $HOME\Downloads
-# (Optional) restrict key permissions if Windows complains
-icacls .\aws-key.pem /inheritance:r
-icacls .\aws-key.pem /grant:r "$($env:USERNAME):(R)"
-
-ssh -i .\aws-key.pem ubuntu@34.226.191.36
-
-# Install Docker
-On the EC2 box
-sudo apt-get update -y
-sudo apt-get install -y docker.io git
-sudo systemctl enable --now docker
-sudo usermod -aG docker ubuntu
-sudo systemctl enable --now docker
-newgrp docker   # or reconnect SSH after 'usermod -aG docker ubuntu'
-# Reconnect SSH so your user has docker perms, or run 'newgrp docker'
-
-# Cloning
-cd ~
-git clone https://github.com/wisemichael/sentiment-analysis-cicd.git
-cd sentiment-analysis-cicd
-git branch -a   # confirm branches
-
-# Build Images on EC2
-docker build -t sentiment-api -f Dockerfile.api .
-docker build -t sentiment-monitor -f Dockerfile.monitoring .
-
-# Shared volume + network
-docker volume create app-logs
-docker network create sentiment-net
-
-# API
-docker run -d --name api --network sentiment-net \
-  -p 8000:8000 \
-  -v app-logs:/app/logs \
-  sentiment-api
-
-# Monitoring (points to 'api' by service name)
-docker run -d --name monitoring --network sentiment-net \
-  -p 8501:8501 \
-  -e API_URL=http://api:8000 \
-  -v app-logs:/app/logs \
-  sentiment-monitor
-
-# Verify from EC2
-curl -s http://localhost:8000/health
-curl -s -X POST http://localhost:8000/predict \
+## Prediction
+curl -X POST http://localhost:8000/predict \
   -H "Content-Type: application/json" \
-  -d '{"text":"This is great!"}'
+  -d '{"text":"You are awesome!"}'
+ 
+## Running in Powershell
+curl.exe http://localhost:8000/health
+curl.exe -X POST http://localhost:8000/predict `
+  -H "Content-Type: application/json" `
+  -d "{""text"":""You are awesome!""}"
 
-# See that both containers share the logs volume
-docker exec api        ls -l /app/logs
-docker exec api        tail -n 5 /app/logs/prediction_logs.json
-docker exec monitoring ls -l /app/logs
+# Service status
+docker compose -f infra/docker-compose.dev.yaml ps
 
-# If corporate firewall exits
-ssh -i $HOME\Downloads\aws-key.pem `
-    -L 8000:localhost:8000 `
-    -L 8501:localhost:8501 `
-    ubuntu@<34.226.191.36
-sudo ufw status
-sudo ufw allow 22
-sudo ufw allow 8000
-sudo ufw allow 8501
+# Logs
+docker compose -f infra/docker-compose.dev.yaml logs -f toxic-api
+docker compose -f infra/docker-compose.dev.yaml logs -f toxic-frontend
+docker compose -f infra/docker-compose.dev.yaml logs -f toxic-monitoring
+docker compose -f infra/docker-compose.dev.yaml logs -f toxic-db
 
-docker ps
-docker logs api --tail 50
-docker logs monitoring --tail 50
+# Shell into API container
+docker compose -f infra/docker-compose.dev.yaml exec toxic-api bash
 
-# Clean restart
-docker rm -f monitoring api || true
-# (then re-run the two docker run commands)
+# === API/Model ===
+MODEL_VERSION=baseline-tfidf-logreg
+ALLOW_FALLBACK_MODEL=true
 
----
+# === MLflow (optional) ===
+# MLFLOW_TRACKING_URI=
+# MLFLOW_MODEL_NAME=toxic-comment-model
+# MODEL_STAGE=Production
 
-# Public IPs
-[http://localhost:8000/docs](http://34.226.191.36:8000/docs)
-[http://localhost:8000/health](http://34.226.191.36:8000/health)
-[http://localhost:8501](http://34.226.191.36:8501)
+# === Database ===
+DATABASE_URL=postgresql+psycopg2://postgres:postgres@postgres:5432/preds
 
-# CI Testing
-flake8 api/ monitoring/ tests/
-pytest -q
-Open a pull request from dev → main
+# === Frontend ===
+API_URL=http://api:8000
+
+## Training
+python -m ml.train --data ml\data\train.csv
+
+## Testing
+# Windows PowerShell
+$env:PYTHONPATH="."
+$env:TESTING="1"
+PYTHONPATH=. TESTING=1 pytest -q
+
+## Endpoints
+GET /health → { ok: true, model_version }
+POST /predict → { id, label, probability, model_version }
+POST /feedback → { ok: true } (updates predictions.feedback)
+
+## Troubleshooting
+- If the API container logs show `Model not loaded`, ensure artifacts exist in `api/app/artifacts/` (vectorizer + classifier).
+- If the monitoring dashboard cannot connect to Postgres, check that `DATABASE_URL` in `.env` matches the service name `postgres`.
+- Windows users: prefer `curl.exe` instead of `curl` when testing endpoints in PowerShell.
+
+
+## Cleanup
+Remove:
+__pycache__/, .pytest_cache/, .ruff_cache/ (caches)
+The root Docker-compose.all.yaml (we use infra/docker-compose.dev.yaml)
+Any unused “hello.py” samples if present
+
+
