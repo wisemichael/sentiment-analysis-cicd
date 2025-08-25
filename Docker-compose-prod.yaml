@@ -1,0 +1,34 @@
+version: "3.9"
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    env_file: .env
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - MODEL_VERSION=${MODEL_VERSION}
+      - ALLOW_FALLBACK_MODEL=${ALLOW_FALLBACK_MODEL}
+      - MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI}
+      - MLFLOW_MODEL_NAME=${MLFLOW_MODEL_NAME}
+      - MODEL_STAGE=${MODEL_STAGE}
+    ports: ["8000:8000"]
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    env_file: .env
+    environment:
+      - API_URL=${API_URL}   # e.g., http://<API-EC2-DNS>:8000
+    ports: ["8501:8501"]
+
+  monitoring:
+    build:
+      context: .
+      dockerfile: monitoring/Dockerfile
+    env_file: .env
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+    ports: ["8502:8502"]
