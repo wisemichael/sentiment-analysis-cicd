@@ -75,6 +75,19 @@ Table: predictions
 curl http://localhost:8000/health
 # -> {"ok":true,"model_version":"baseline-tfidf-logreg"}
 
+Experiment Tracking & Monitoring (Weights & Biases)
+This project also logs model metrics and monitoring data to Weights & Biases (W&B)
+
+toxicity rate over time
+number of predictions
+average latency (ms)
+live accuracy
+
+# Access
+Project dashboard (W&B): W&B Toxic Comment Moderation
+
+If you are not a member of the project team, please request access.
+
 ## Prediction
 curl -X POST http://localhost:8000/predict \
   -H "Content-Type: application/json" \
@@ -142,5 +155,7 @@ Any unused “hello.py” samples if present
 ## Links
 
 - **GitHub repository:** https://github.com/wisemichael/sentiment-analysis-cicd
-- **Experiment tracking (W&B):** https://wandb.ai/<your-entity>/toxic-comment-moderation
+- **Streamlit demo (local):** http://localhost:8501
+- **Monitoring dashboard (local):** http://localhost:8502
+- **Experiment tracking (W&B):** https://wandb.ai/wise-michael-t-university-of-denver/toxic-comment-moderation
 
