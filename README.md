@@ -139,4 +139,8 @@ __pycache__/, .pytest_cache/, .ruff_cache/ (caches)
 The root Docker-compose.all.yaml (we use infra/docker-compose.dev.yaml)
 Any unused “hello.py” samples if present
 
+## Links
+
+- **GitHub repository:** https://github.com/wisemichael/sentiment-analysis-cicd
+- **Experiment tracking (W&B):** https://wandb.ai/<your-entity>/toxic-comment-moderation
 
